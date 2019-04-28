@@ -228,7 +228,7 @@ bool checkForGroup() {
 
 /**
  * @brief One person (process) life
- * It starts, goes to the molo, boards the boat and dies...
+ * It starts, goes to the pier, boards the boat and dies...
  * @param type type of the person (HACKER/SURFER)
  * @param id ID of the person
  * @param pdata program variables (e.g. for timing data)
@@ -283,7 +283,7 @@ void personLife(int type, int id, FILE* file) {
         sem_post(sems->printing);
     }
 
-    // ******** MOLO WAS REACHED SUCCESSFULLY ******** //
+    // ******** PIER WAS REACHED SUCCESSFULLY ******** //
 
     sem_wait(sems->groupManipulation);
     bool iAmCaptain = checkForGroup();
