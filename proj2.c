@@ -185,6 +185,10 @@ void addToPier(int type) {
  */
 bool checkForGroup() {
     if (pier->hackers >= 4) {
+        // there was a matching group, start the journey
+        sem_wait(sems->journey);
+        sem_wait(sems->printing); // to the captain boarding
+
         sem_post(sems->hackerQueue);
         sem_post(sems->hackerQueue);
         sem_post(sems->hackerQueue);
@@ -192,6 +196,10 @@ bool checkForGroup() {
         pier->hackers -= 4;
     }
     else if (pier->surfers >= 4) {
+        // there was a matching group, start the journey
+        sem_wait(sems->journey);
+        sem_wait(sems->printing); // to the captain boarding
+
         sem_post(sems->surferQueue);
         sem_post(sems->surferQueue);
         sem_post(sems->surferQueue);
@@ -199,6 +207,10 @@ bool checkForGroup() {
         pier->surfers -= 4;
     }
     else if (pier->surfers >= 2 && pier->hackers >= 2) {
+        // there was a matching group, start the journey
+        sem_wait(sems->journey);
+        sem_wait(sems->printing); // to the captain boarding
+
         sem_post(sems->hackerQueue);
         sem_post(sems->hackerQueue);
         sem_post(sems->surferQueue);
@@ -210,10 +222,6 @@ bool checkForGroup() {
         // no matching group on the pier
         return false;
     }
-
-    // there was a matching group, start the journey
-    sem_wait(sems->journey);
-    sem_wait(sems->printing); // to the captain boarding
 
     return true;
 }
