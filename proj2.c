@@ -35,6 +35,9 @@
 #define SEM_JOURNEY "xsvabi00.ios.proj2.journey.sem"
 #define SEM_CAPTAINWAITS "xsvabi00.ios.proj2.captainwaits.sem"
 
+#define REMOVE_SEMAPHORES_COMMAND "rm -f /dev/shm/sem.xsvabi00.ios.proj2.* /dev/shm/xsvabi00.ios.proj2.*"
+#define OUTPUT_FILE "proj2.out"
+
 // simpler mapping
 #define MMAP(pointer) {(pointer) = mmap(NULL, sizeof(*(pointer)), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);}
 #define UNMAP(pointer) {munmap((pointer), sizeof(*(pointer)));}
@@ -77,12 +80,12 @@ typedef struct pier {
  * Structure with the program arguments for simpler access.
  */
 typedef struct data {
-    unsigned peopleInGroup;
-    unsigned maxHackersDelay;
-    unsigned maxSurfersDelay;
-    unsigned maxCruiseTime;
-    unsigned maxBackToPier;
-    unsigned maxPierCapacity;
+    int peopleInGroup;
+    int maxHackersDelay;
+    int maxSurfersDelay;
+    int maxCruiseTime;
+    int maxBackToPier;
+    int maxPierCapacity;
 } data_t;
 
 // shared variables to map
@@ -100,6 +103,10 @@ sem_list_t* sems = NULL;
  * @return false pokud se nepodari otevrit/vytvorit semafor
  */
 bool init(data_t* pdata) {
+    // create the action counter
+    MMAP(actionCounter);
+    *actionCounter = 0;
+
     // pier init
     MMAP(pier);
     pier->hackers = pier->surfers = 0;
@@ -215,11 +222,11 @@ bool checkForGroup() {
  * @param id ID of the person
  * @param pdata program variables (e.g. for timing data)
  */
-void zivot(int type, int id, data_t* pdata) {
+void zivot(int type, int id, data_t* pdata, FILE* file) {
     // ******** THE LIFE BEGINS ******** //
 
     sem_wait(sems->printing);
-    printf("%d:\t%s %d\t\tstarts\n", ++*actionCounter, ptn[type], id);
+    fprintf(file, "%d\t\t: %s %d\t\tstarts\n", ++*actionCounter, ptn[type], id);
     sem_post(sems->printing);
 
     // ******** GOING TO THE PIER ******** //
@@ -233,15 +240,21 @@ void zivot(int type, int id, data_t* pdata) {
         sem_getvalue(sems->pierFreeCapacity, &sem_test);
         if (sem_test <= 0) {
             // no, try it again after some time
-            printf("%d:\t%s %d\t\tleaves queue\t: %d\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
+            sem_wait(sems->printing);
+            fprintf(file, "%d\t\t: %s %d\t\tleaves queue\t: %d\t\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
+            sem_post(sems->printing);
         }
         else {
             // yes, decrement the capacity and go to pier
             sem_wait(sems->pierFreeCapacity);
+
             sem_wait(sems->groupManipulation);
             addToPier(type);
             sem_post(sems->groupManipulation);
-            printf("%d:\t%s %d\t\twaits\t\t: %d\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
+
+            sem_wait(sems->printing);
+            fprintf(file, "%d\t\t: %s %d\t\twaits\t\t\t: %d\t\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
+            sem_post(sems->printing);
             
             // pierchecking ends
             sem_post(sems->piertesting);
@@ -253,7 +266,10 @@ void zivot(int type, int id, data_t* pdata) {
 
         // random waiting time to check the pier capacity again
         usleep(rand() % (pdata->maxBackToPier >= 20 ? pdata->maxBackToPier : 20) * 1000);
-        printf("%d:\t%s %d\t\tis back\n", ++*actionCounter, ptn[type], id);
+
+        sem_wait(sems->printing);
+        fprintf(file, "%d\t\t: %s %d\t\tis back\n", ++*actionCounter, ptn[type], id);
+        sem_post(sems->printing);
     }
 
     // ******** MOLO WAS REACHED SUCCESSFULLY ******** //
@@ -283,7 +299,7 @@ void zivot(int type, int id, data_t* pdata) {
         sem_post(sems->pierFreeCapacity);
         
         // print the captain's boarding
-        printf("%d:\t%s %d\t\tboards\t\t: %d\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
+        fprintf(file, "%d\t\t: %s %d\t\tboards\t\t\t: %d\t\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
         sem_post(sems->printing);
 
         // do the journey
@@ -306,7 +322,7 @@ void zivot(int type, int id, data_t* pdata) {
     if (!iAmCaptain) {
         // exit the boat
         sem_wait(sems->printing);
-        printf("%d:\t%s %d\t\tmember exits\t: %d\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
+        fprintf(file, "%d\t\t: %s %d\t\tmember exits\t: %d\t\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
         sem_post(sems->printing);
 
         // I am out! The captain could get out if I am the last!
@@ -315,7 +331,7 @@ void zivot(int type, int id, data_t* pdata) {
     else {
         // captain exits the boat
         sem_wait(sems->printing);
-        printf("%d:\t%s %d\t\tcaptain exits\t: %d\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
+        fprintf(file, "%d\t\t: %s %d\t\tcaptain exits\t: %d\t\t: %d\n", ++*actionCounter, ptn[type], id, pier->hackers, pier->surfers);
         sem_post(sems->printing);
 
         // the journey ends...
@@ -332,13 +348,15 @@ void zivot(int type, int id, data_t* pdata) {
  * @param type the type of the generated people (HACKER/SURFER)
  * @param pdata Program data (arguments) (especially for timing data)
  */
-void generateProcess(int type, data_t* pdata) {
-    for (unsigned i = 0; i < pdata->peopleInGroup; i++) {
+void generateProcess(int type, data_t* pdata, FILE* file) {
+    for (int i = 0; i < pdata->peopleInGroup; i++) {
         pid_t pid = fork();
         if (pid == 0)
-            zivot(type, i+1, pdata);
-        else if (pid < 0)
-            fprintf(stderr, "Chyba pri forkovani\n");
+            zivot(type, i+1, pdata, file);
+        else if (pid < 0) {
+            fprintf(stderr, "Error when trying to fork the generating process.\n");
+            exit(EXIT_FAILURE);
+        }
 
         // wait until new process should be generated
         if (type == HACKER && pdata->maxHackersDelay > 0)
@@ -348,59 +366,121 @@ void generateProcess(int type, data_t* pdata) {
     }
 
     // wait for all the processes generated
-    for (unsigned i = 0; i < pdata->peopleInGroup*2; i++)
+    for (int i = 0; i < pdata->peopleInGroup*2; i++)
         wait(NULL);
     
     // end this process
     exit(0);
 }
 
+/**
+ * @brief Check and extract the arguments
+ * Check the format of program arguments given and extract them if there is no problem.
+ * @param argc The number of program arguments
+ * @param argv The array of program arguments
+ * @param pdata Structure where to store the program arguments
+ * @return true if there is no problem with the arguments
+ * @return false if there is a problem with the arguments
+ */
+bool checkArguments(int argc, char* argv[], data_t* pdata) {
+    // check the number of arguments
+    if (argc != 7) {
+        fprintf(stderr, "Wrong number of arguments. You should give me exactly 6 arguments.\n");
+        return false;
+    }
+
+    // * EXTRACT THE VALUE FROM THE PROGRAM ARGUMENTS AND CHECK THEM
+    char* pattern;
+
+    // people in group
+    pdata->peopleInGroup = strtol(argv[1], &pattern, 10);
+    if (strlen(pattern) > 0 || pdata->peopleInGroup < 2 || pdata->peopleInGroup % 2 != 0) {
+        fprintf(stderr, "The first argument (people in group) has to be number greater or equal to 2 and peopleInGroup %% 2 has to be 0.\n");
+        return false;
+    }
+
+    // max hackers delay
+    pdata->maxHackersDelay = strtol(argv[2], &pattern, 10);
+    if (strlen(pattern) > 0 || pdata->maxHackersDelay < 0 || pdata->maxHackersDelay > 2000) {
+        fprintf(stderr, "The second argument (max hackers delay) has to be number greater or equal to 0 and lower or equal to 2000.\n");
+        return false;
+    }
+
+    // max surfers delay
+    pdata->maxSurfersDelay = strtol(argv[3], &pattern, 10);
+    if (strlen(pattern) > 0 || pdata->maxSurfersDelay < 0 || pdata->maxSurfersDelay > 2000) {
+        fprintf(stderr, "The third argument (max surfers delay) has to be number greater or equal to 0 and lower or equal to 2000.\n");
+        return false;
+    }
+
+    // max surfers delay
+    pdata->maxCruiseTime = strtol(argv[4], &pattern, 10);
+    if (strlen(pattern) > 0 || pdata->maxCruiseTime < 0 || pdata->maxCruiseTime > 2000) {
+        fprintf(stderr, "The fourth argument (max cruise time) has to be number greater or equal to 0 and lower or equal to 2000.\n");
+        return false;
+    }
+
+    // max pier waiting checking time
+    pdata->maxBackToPier = strtol(argv[5], &pattern, 10);
+    if (strlen(pattern) > 0 || pdata->maxBackToPier < 20 || pdata->maxBackToPier > 2000) {
+        fprintf(stderr, "The fifth argument (max pier waiting checking time) has to be number greater or equal to 20 and lower or equal to 2000.\n");
+        return false;
+    }
+
+    // max pier waiting checking time
+    pdata->maxPierCapacity = strtol(argv[6], &pattern, 10);
+    if (strlen(pattern) > 0 || pdata->maxPierCapacity < 5) {
+        fprintf(stderr, "The sixth argument (max pier capacity) has to be number greater or equal to 5.\n");
+        return false;
+    }
+
+    return true;
+}
+
 // just the program entry point...
 int main(int argc, char* argv[]) {
+    // extract and check the arguments
+    data_t* pdata = malloc(sizeof(data_t));
+    if (!checkArguments(argc, argv, pdata))
+        return EXIT_FAILURE;
+
     // initialize the random number generator
     srand(time(NULL));
 
-    if (argc != 7) {
-        printf("Wrong number of arguments!?\n");
+    // prepare the file
+    FILE* file = fopen(OUTPUT_FILE, "w+");
+    if (file == NULL) {
+        fprintf(stderr, "Cannot open the output file.\n");
         return EXIT_FAILURE;
     }
-    
-    // load the data from the program arguments
-    data_t* pdata = malloc(sizeof(data_t));
-    pdata->peopleInGroup = strtol(argv[1], NULL, 10);
-    pdata->maxHackersDelay = strtol(argv[2], NULL, 10);
-    pdata->maxSurfersDelay = strtol(argv[3], NULL, 10);
-    pdata->maxCruiseTime = strtol(argv[4], NULL, 10);
-    pdata->maxBackToPier = strtol(argv[5], NULL, 10);
-    pdata->maxPierCapacity = strtol(argv[6], NULL, 10);
 
-    // create the action counter
-    MMAP(actionCounter);
-    *actionCounter = 0;
+    // remove file buffer to ensure that only one process really write data into the file
+    setbuf(file, NULL);
+    // setvbuf(file, NULL, _IONBF, 0);
 
     // create the semaphores and set them up to the first values
     if (!init(pdata)) {
-        fprintf(stderr, "Nepovedlo se!\n");
+        fprintf(stderr, "Cannot initialize semaphores and map the shared variables. Try to remove the semaphores by using the '%s' command\n", REMOVE_SEMAPHORES_COMMAND);
         return EXIT_FAILURE;
     }
 
     // generate the surfers
     pid_t pidSurfers = fork();
     if (pidSurfers == 0) {
-        generateProcess(SURFER, pdata);
+        generateProcess(SURFER, pdata, file);
     }
     else if (pidSurfers < 0) {
-        fprintf(stderr, "Chyba pri forkovani.\n");
+        fprintf(stderr, "There was a problem when trying to fork the main process.\n");
         return EXIT_FAILURE;
     }
 
     // generate the hackers
     pid_t pidHackers = fork();
     if (pidHackers == 0) {
-        generateProcess(HACKER, pdata);
+        generateProcess(HACKER, pdata, file);
     }
     else if (pidHackers < 0) {
-        fprintf(stderr, "Chyba pri forkovani hackeru\n");
+        fprintf(stderr, "There was a problem when trying to fork the main process\n");
         return EXIT_FAILURE;
     }
 
@@ -409,8 +489,9 @@ int main(int argc, char* argv[]) {
     wait(NULL); // the second group
 
     // deallocate the memory and close and remove the semaphores
-    free(pdata);
     clear();
+    free(pdata);
+    fclose(file);
 
     return EXIT_SUCCESS;
 }
