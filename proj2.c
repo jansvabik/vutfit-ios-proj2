@@ -394,58 +394,50 @@ void generateProcess(int type, FILE* file) {
  * @return false if there is a problem with the arguments
  */
 bool checkArguments(int argc, char* argv[]) {
+    // problem counter
+    int problems = 0;
+
     // check the number of arguments
-    if (argc != 7) {
-        fprintf(stderr, "Wrong number of arguments. You should give me exactly 6 arguments.\n");
-        return false;
-    }
+    if (argc != 7)
+        fprintf(stderr, "Problem %d: Wrong number of arguments. You should give me exactly 6 arguments.\n", ++problems);
 
     // * EXTRACT THE VALUE FROM THE PROGRAM ARGUMENTS AND CHECK THEM
     char* pattern;
 
     // people in group
     pdata->peopleInGroup = strtol(argv[1], &pattern, 10);
-    if (strlen(pattern) > 0 || pdata->peopleInGroup < 2 || pdata->peopleInGroup % 2 != 0) {
-        fprintf(stderr, "The first argument (people in group) has to be number greater or equal to 2 and peopleInGroup %% 2 has to be 0.\n");
-        return false;
-    }
+    if (strlen(pattern) > 0 || pdata->peopleInGroup < 2 || pdata->peopleInGroup % 2 != 0)
+        fprintf(stderr, "Problem %d: The first argument (people in group) has to be number greater or equal to 2 and peopleInGroup %% 2 has to be 0.\n", ++problems);
 
     // max hackers delay
     pdata->maxHackersDelay = strtol(argv[2], &pattern, 10);
-    if (strlen(pattern) > 0 || pdata->maxHackersDelay < 0 || pdata->maxHackersDelay > 2000) {
-        fprintf(stderr, "The second argument (max hackers delay) has to be number greater or equal to 0 and lower or equal to 2000.\n");
-        return false;
-    }
+    if (strlen(pattern) > 0 || pdata->maxHackersDelay < 0 || pdata->maxHackersDelay > 2000)
+        fprintf(stderr, "Problem %d: The second argument (max hackers delay) has to be number greater or equal to 0 and lower or equal to 2000.\n", ++problems);
 
     // max surfers delay
     pdata->maxSurfersDelay = strtol(argv[3], &pattern, 10);
-    if (strlen(pattern) > 0 || pdata->maxSurfersDelay < 0 || pdata->maxSurfersDelay > 2000) {
-        fprintf(stderr, "The third argument (max surfers delay) has to be number greater or equal to 0 and lower or equal to 2000.\n");
-        return false;
-    }
+    if (strlen(pattern) > 0 || pdata->maxSurfersDelay < 0 || pdata->maxSurfersDelay > 2000)
+        fprintf(stderr, "Problem %d: The third argument (max surfers delay) has to be number greater or equal to 0 and lower or equal to 2000.\n", ++problems);
 
     // max surfers delay
     pdata->maxCruiseTime = strtol(argv[4], &pattern, 10);
-    if (strlen(pattern) > 0 || pdata->maxCruiseTime < 0 || pdata->maxCruiseTime > 2000) {
-        fprintf(stderr, "The fourth argument (max cruise time) has to be number greater or equal to 0 and lower or equal to 2000.\n");
-        return false;
-    }
+    if (strlen(pattern) > 0 || pdata->maxCruiseTime < 0 || pdata->maxCruiseTime > 2000)
+        fprintf(stderr, "Problem %d: The fourth argument (max cruise time) has to be number greater or equal to 0 and lower or equal to 2000.\n", ++problems);
 
     // max pier waiting checking time
     pdata->maxBackToPier = strtol(argv[5], &pattern, 10);
-    if (strlen(pattern) > 0 || pdata->maxBackToPier < 20 || pdata->maxBackToPier > 2000) {
-        fprintf(stderr, "The fifth argument (max pier waiting checking time) has to be number greater or equal to 20 and lower or equal to 2000.\n");
-        return false;
-    }
+    if (strlen(pattern) > 0 || pdata->maxBackToPier < 20 || pdata->maxBackToPier > 2000)
+        fprintf(stderr, "Problem %d: The fifth argument (max pier waiting checking time) has to be number greater or equal to 20 and lower or equal to 2000.\n", ++problems);
 
     // max pier waiting checking time
     pdata->maxPierCapacity = strtol(argv[6], &pattern, 10);
-    if (strlen(pattern) > 0 || pdata->maxPierCapacity < 5) {
-        fprintf(stderr, "The sixth argument (max pier capacity) has to be number greater or equal to 5.\n");
-        return false;
-    }
+    if (strlen(pattern) > 0 || pdata->maxPierCapacity < 5)
+        fprintf(stderr, "Problem %d: The sixth argument (max pier capacity) has to be number greater or equal to 5.\n", ++problems);
 
-    return true;
+    if (problems == 0)
+        return true;
+    else
+        return false;
 }
 
 /**
