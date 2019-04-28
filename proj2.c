@@ -472,7 +472,6 @@ int main(int argc, char* argv[]) {
 
     // remove file buffer to ensure that only one process really write data into the file
     setbuf(file, NULL);
-    // setvbuf(file, NULL, _IONBF, 0);
 
     // create the semaphores and set them up to the first values
     if (!init()) {
