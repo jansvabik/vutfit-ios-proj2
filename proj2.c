@@ -91,6 +91,8 @@ typedef struct data {
 // shared variables to map
 pier_t* pier = NULL;
 int* actionCounter = NULL;
+data_t* pdata = NULL;
+FILE* file = NULL;
 
 // semaphore storing
 sem_list_t* sems = NULL;
@@ -102,7 +104,7 @@ sem_list_t* sems = NULL;
  * @return true kdyz nenastane zadna chyba
  * @return false pokud se nepodari otevrit/vytvorit semafor
  */
-bool init(data_t* pdata) {
+bool init() {
     // create the action counter
     MMAP(actionCounter);
     *actionCounter = 0;
@@ -159,6 +161,7 @@ void clear() {
     // shared variables
     UNMAP(sems);
     UNMAP(pier);
+    UNMAP(pdata);
     UNMAP(actionCounter);
 }
 
@@ -222,7 +225,7 @@ bool checkForGroup() {
  * @param id ID of the person
  * @param pdata program variables (e.g. for timing data)
  */
-void zivot(int type, int id, data_t* pdata, FILE* file) {
+void zivot(int type, int id, FILE* file) {
     // ******** THE LIFE BEGINS ******** //
 
     sem_wait(sems->printing);
@@ -348,11 +351,11 @@ void zivot(int type, int id, data_t* pdata, FILE* file) {
  * @param type the type of the generated people (HACKER/SURFER)
  * @param pdata Program data (arguments) (especially for timing data)
  */
-void generateProcess(int type, data_t* pdata, FILE* file) {
+void generateProcess(int type, FILE* file) {
     for (int i = 0; i < pdata->peopleInGroup; i++) {
         pid_t pid = fork();
         if (pid == 0)
-            zivot(type, i+1, pdata, file);
+            zivot(type, i+1, file);
         else if (pid < 0) {
             fprintf(stderr, "Error when trying to fork the generating process.\n");
             exit(EXIT_FAILURE);
@@ -382,7 +385,7 @@ void generateProcess(int type, data_t* pdata, FILE* file) {
  * @return true if there is no problem with the arguments
  * @return false if there is a problem with the arguments
  */
-bool checkArguments(int argc, char* argv[], data_t* pdata) {
+bool checkArguments(int argc, char* argv[]) {
     // check the number of arguments
     if (argc != 7) {
         fprintf(stderr, "Wrong number of arguments. You should give me exactly 6 arguments.\n");
@@ -437,18 +440,31 @@ bool checkArguments(int argc, char* argv[], data_t* pdata) {
     return true;
 }
 
+/**
+ * @brief Deinitialization
+ * Deallocates the memory allocated, closes and unlinks the semaphores and closes the output file.
+ */
+void deinit() {
+    clear();
+    fclose(file);
+}
+
 // just the program entry point...
 int main(int argc, char* argv[]) {
+    // do the deinitialization when program ends unexpectedly
+    signal(SIGTERM, deinit);
+    signal(SIGINT, deinit);
+    
     // extract and check the arguments
-    data_t* pdata = malloc(sizeof(data_t));
-    if (!checkArguments(argc, argv, pdata))
+    MMAP(pdata);
+    if (!checkArguments(argc, argv))
         return EXIT_FAILURE;
 
     // initialize the random number generator
     srand(time(NULL));
 
     // prepare the file
-    FILE* file = fopen(OUTPUT_FILE, "w+");
+    file = fopen(OUTPUT_FILE, "w+");
     if (file == NULL) {
         fprintf(stderr, "Cannot open the output file.\n");
         return EXIT_FAILURE;
@@ -459,7 +475,7 @@ int main(int argc, char* argv[]) {
     // setvbuf(file, NULL, _IONBF, 0);
 
     // create the semaphores and set them up to the first values
-    if (!init(pdata)) {
+    if (!init()) {
         fprintf(stderr, "Cannot initialize semaphores and map the shared variables. Try to remove the semaphores by using the '%s' command\n", REMOVE_SEMAPHORES_COMMAND);
         return EXIT_FAILURE;
     }
@@ -467,7 +483,7 @@ int main(int argc, char* argv[]) {
     // generate the surfers
     pid_t pidSurfers = fork();
     if (pidSurfers == 0) {
-        generateProcess(SURFER, pdata, file);
+        generateProcess(SURFER, file);
     }
     else if (pidSurfers < 0) {
         fprintf(stderr, "There was a problem when trying to fork the main process.\n");
@@ -477,7 +493,7 @@ int main(int argc, char* argv[]) {
     // generate the hackers
     pid_t pidHackers = fork();
     if (pidHackers == 0) {
-        generateProcess(HACKER, pdata, file);
+        generateProcess(HACKER, file);
     }
     else if (pidHackers < 0) {
         fprintf(stderr, "There was a problem when trying to fork the main process\n");
@@ -489,9 +505,7 @@ int main(int argc, char* argv[]) {
     wait(NULL); // the second group
 
     // deallocate the memory and close and remove the semaphores
-    clear();
-    free(pdata);
-    fclose(file);
+    deinit();
 
     return EXIT_SUCCESS;
 }
