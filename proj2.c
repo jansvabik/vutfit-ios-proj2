@@ -5,7 +5,7 @@
  * @version 1.0
  * @date 2019-04-28
  * 
- * ! IF THE SEMAPHORE DELETION IS NEEDED !
+ * !!! IF THE SEMAPHORE DELETION IS NEEDED !!!
  * SEMAPHORE NAMES: xsvabi00.ios.proj2.*.sem
  * IN THE /dev/shm DIRECTORY USUALLY: sem.xsvabi00.ios.proj2.*.sem
  * rm -f /dev/shm/sem.xsvabi00.ios.proj2.* /dev/shm/xsvabi00.ios.proj2.*
@@ -398,8 +398,10 @@ bool checkArguments(int argc, char* argv[]) {
     int problems = 0;
 
     // check the number of arguments
-    if (argc != 7)
+    if (argc != 7) {
         fprintf(stderr, "Problem %d: Wrong number of arguments. You should give me exactly 6 arguments.\n", ++problems);
+        return false;
+    }
 
     // * EXTRACT THE VALUE FROM THE PROGRAM ARGUMENTS AND CHECK THEM
     char* pattern;
@@ -434,10 +436,9 @@ bool checkArguments(int argc, char* argv[]) {
     if (strlen(pattern) > 0 || pdata->maxPierCapacity < 5)
         fprintf(stderr, "Problem %d: The sixth argument (max pier capacity) has to be number greater or equal to 5.\n", ++problems);
 
-    if (problems == 0)
-        return true;
-    else
+    if (problems > 0)
         return false;
+    return true;
 }
 
 /**
