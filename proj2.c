@@ -225,7 +225,7 @@ bool checkForGroup() {
  * @param id ID of the person
  * @param pdata program variables (e.g. for timing data)
  */
-void zivot(int type, int id, FILE* file) {
+void personLife(int type, int id, FILE* file) {
     // ******** THE LIFE BEGINS ******** //
 
     sem_wait(sems->printing);
@@ -355,7 +355,7 @@ void generateProcess(int type, FILE* file) {
     for (int i = 0; i < pdata->peopleInGroup; i++) {
         pid_t pid = fork();
         if (pid == 0)
-            zivot(type, i+1, file);
+            personLife(type, i+1, file);
         else if (pid < 0) {
             fprintf(stderr, "Error when trying to fork the generating process.\n");
             exit(EXIT_FAILURE);
@@ -454,7 +454,7 @@ int main(int argc, char* argv[]) {
     // do the deinitialization when program ends unexpectedly
     signal(SIGTERM, deinit);
     signal(SIGINT, deinit);
-    
+
     // extract and check the arguments
     MMAP(pdata);
     if (!checkArguments(argc, argv))
